@@ -33,11 +33,12 @@ async function disparar(nombre) {
   return (await respuesta.json()).shipmentId;
 }
 
+// El tercer fallo y el demorado tardan varios minutos reales por el reloj simulado.
 const hastaEstado = (id, estado, extra = () => true) =>
   until(`${id} en ${estado}`, async () => {
     const e = await envio(id);
     return e?.estado === estado && extra(e) ? e : null;
-  });
+  }, 300000);
 
 const tests = [];
 const test = (nombre, fn) => tests.push({ nombre, fn });
@@ -249,8 +250,10 @@ test('Reconstruccion: borrar envios y reprocesar deja la coleccion igual', async
   ).toString().trim();
   const id = proceso.split('\n').pop();
   try {
-    await until('la reconstruccion', async () => (await db.collection('envios').countDocuments()) >= antes.length, 90000);
-    await sleep(10000);
+    // Espera a que la coleccion se vacie y vuelva a tener todos los documentos, sin cambios.
+    await until('el borrado', async () => (await db.collection('envios').countDocuments()) < antes.length, 30000);
+    await until('la reconstruccion', async () => (await db.collection('envios').countDocuments()) >= antes.length, 240000);
+    await sleep(15000);
     const despues = await foto();
     assert.equal(despues.length, antes.length);
     assert.deepEqual(despues, antes);
